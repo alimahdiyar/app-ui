@@ -17,13 +17,14 @@ import {
     makeDeiRequest, getDeiInfo, dollarDecimals, getHusdPoolData,
     redeem1to1Dei, redeemFractionalDei, redeemAlgorithmicDei, getClaimAll, mintFractional, mintAlgorithmic,
     buyBackDEUS, RecollateralizeDEI, getStakingData, getStakingTokenData, DeiDeposit, DeiWithdraw, SendWithToast,
-    mint1t1DEI, collatUsdPrice, zapIn, getZapAmountsOut
+    mint1t1DEI, collatUsdPrice, zapIn, getZapAmountsOut, getJ, 
 } from '../helper/deiHelper'
 import { blockNumberState } from '../store/wallet'
 import { formatBalance3 } from '../utils/utils'
 import { collateralToken } from '../constant/token'
-import { COLLATERAL_ADDRESS, MINT_PATH } from '../constant/contracts'
-import { getDeusSwapContract, getNewProxyMinterContract } from '../helper/contractHelpers'
+import { COLLATERAL_ADDRESS, MINT_PATH, SELL_PATH } from '../constant/contracts'
+import { getDeusSwapContract, getNewProxyMinterContract, getDeusSwapSellContract } from '../helper/contractHelpers'
+import { ChainId } from '../constant/web3'
 
 
 export const useAPY = (validChainId) => {
@@ -353,74 +354,105 @@ export const useMint = (from1Currency, from2Currency, toCurrency, amountIn1, amo
 }
 
 
-export const useSwap = (from1Currency, toCurrency, amountIn1, amountOut, collatRatio, slippage, proxy, amountOutParams, validChainId) => {
+export const useSwap = (fromCurrency, toCurrency, amountIn, amountOut, collatRatio, slippage, proxy, amountOutParams, validChainId) => {
     const web3 = useWeb3()
     const { account, chainId } = useWeb3React()
 
-    const handleMint = useCallback(async () => {
-
+    const handleSwap = useCallback(async () => {
         if (validChainId && chainId !== validChainId) return false
-        if (!from1Currency || !toCurrency || !amountIn1 || !amountOut) return
+        if (!fromCurrency || !toCurrency || !amountIn || !amountOut) return
 
-        const amount1toWei = getToWei(amountIn1, from1Currency.decimals).toFixed(0)
+        const amountToWei = getToWei(amountIn, fromCurrency.decimals).toFixed(0)
         const amountOutToWei = getToWei(amountOut, toCurrency.decimals).toFixed(0)
         const minAmountOutToWei = getToWei(amountOut, toCurrency.decimals).times(1 - (slippage / 100)).toFixed(0)
 
         let fn = null
+        let method = ""
+        let deadline = "0xf000000000000000000000000000000000000000000000000000000000000000"
 
-        let path = "/mint-fractional"
-        try {
-            const result = await makeDeiRequest(path, validChainId)
-            const { collateral_price, deus_price, expire_block, signature } = result
-            const erc20Path = MINT_PATH[chainId][from1Currency.symbol]
-            let method = ""
-            let proxyTuple = []
+        if (fromCurrency.symbol === "DEUS") { // Sell DEUS
+            let toCurrencySymbol = toCurrency.symbol.toUpperCase()
+            let param = []
 
-            if (!!amountOutParams && amountOutParams[0] === amountOutToWei)
-                proxyTuple = [
-                    amount1toWei,
-                    minAmountOutToWei,
-                    deus_price,
-                    collateral_price,
-                    amountOutParams[1],
-                    amountOutParams[2],
-                    expire_block,
-                    [signature]
-                ]
-            let param = [proxyTuple]
-
-            if (from1Currency.address === "0x") {
-                method = "Nativecoin2DEUS"
-                param.push(erc20Path)
-            }
-            else if (from1Currency.address === COLLATERAL_ADDRESS[chainId]) {
-                method = "USDC2DEUS"
-            }
-
-            else {
-                if (!erc20Path) {
-                    console.error("INVALID PATH with ", from1Currency)
-                    return
+            if (chainId === ChainId.ETH) {
+                if (toCurrencySymbol === "USDC" || toCurrencySymbol === "USDT" || toCurrencySymbol === "DEI" ||
+                    toCurrencySymbol === "DAI") { // stableCoin
+                    method = "DEUS2Stablecoin"
+                    param = [amountToWei, minAmountOutToWei, getJ(toCurrency)]
+                } else {
+                    method = "DEUS2ERC20OrEther"
+                    let path = SELL_PATH[chainId][toCurrency.symbol]
+                    let isETH = toCurrencySymbol === "ETH" ? 1 : 0
+                    param = [amountToWei, minAmountOutToWei, getJ(toCurrency), path, isETH]
                 }
-                method = "ERC202DEUS"
-                param.push(erc20Path)
+            } else {
+                method = toCurrencySymbol === "MATIC" ? "swapExactTokensForETH" : "swapExactTokensForTokens"
+                let path = SELL_PATH[chainId][toCurrency.symbol]
+                param = [amountToWei, minAmountOutToWei, path, account, deadline]
             }
-            console.log(method, param);
-            fn = getDeusSwapContract(web3, chainId).methods[method](...param)
 
-        } catch (error) {
-            console.log(error);
+            fn = getDeusSwapSellContract(web3, chainId).methods[method](...param)
+
+            try {
+                return await SendWithToast(fn, account, chainId, `Sell ${amountIn} ${fromCurrency.symbol}`)
+            } catch (error) {
+                console.log(error);
+            }
+        } else {  // Buy DEUS
+            let path = "/mint-fractional"
+            try {
+                const result = await makeDeiRequest(path, validChainId)
+                const { collateral_price, deus_price, expire_block, signature } = result
+                const erc20Path = MINT_PATH[chainId][fromCurrency.symbol]
+                let proxyTuple = []
+                if (amountOutParams.length > 0 && amountOutParams[0] === amountOutToWei)
+                    proxyTuple = [
+                        amountToWei,
+                        minAmountOutToWei,
+                        deus_price,
+                        collateral_price,
+                        amountOutParams[1],
+                        amountOutParams[2],
+                        expire_block,
+                        [signature]
+                    ]
+                let param = [proxyTuple]
+
+                if (fromCurrency.address === "0x") {
+                    method = "Nativecoin2DEUS"
+                    param.push(erc20Path)
+                }
+                else if (fromCurrency.address === COLLATERAL_ADDRESS[chainId]) {
+                    method = "USDC2DEUS"
+                }
+
+                else {
+                    if (!erc20Path) {
+                        console.error("INVALID PATH with ", fromCurrency)
+                        return
+                    }
+                    method = "ERC202DEUS"
+                    param.push(erc20Path)
+                }
+                // console.log(method, param);
+
+                fn = getDeusSwapContract(web3, chainId).methods[method](...param)
+
+            } catch (error) {
+                console.log(error);
+            }
+            const payload = fromCurrency.address === "0x" ? { value: amountToWei } : {}
+
+            try {
+                return await SendWithToast(fn, account, chainId, `Buy ${amountOut} ${toCurrency.symbol}`, payload)
+            } catch (error) {
+                console.log(error);
+            }
         }
-        const payload = from1Currency.address === "0x" ? { value: amount1toWei } : {}
 
-        try {
-            return await SendWithToast(fn, account, chainId, `Mint ${amountOut} ${toCurrency.symbol}`, payload)
-        } catch (error) {
-            console.log(error);
-        }
-    }, [from1Currency, toCurrency, amountIn1, amountOut, slippage, amountOutParams, account, chainId, validChainId, web3])
+    }, [fromCurrency, toCurrency, amountIn, amountOut, slippage, amountOutParams, account, chainId, validChainId, web3])
 
-    return { onMint: handleMint }
+    return { onSwap: handleSwap }
 }
 
 

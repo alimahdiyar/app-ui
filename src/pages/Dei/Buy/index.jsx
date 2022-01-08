@@ -29,6 +29,7 @@ import { Chains } from '../../../components/App/Dei/Chains';
 import DeusTokenBox from '../../../components/App/Dei/DeusTokenBox';
 import DeiTokenBox from '../../../components/App/Dei/BuyDEUS';
 import RateBox from '../../../components/App/Swap/RateBox';
+import { ChainId } from '../../../constant/web3';
 
 const Dei = () => {
     const location = useLocation()
@@ -130,10 +131,15 @@ const Dei = () => {
             let amountIn1 = ""
 
             amountIn1 = in1
-            const amountOutProxy = await getAmountOutDeusSwap(swapState.from, amountIn1, deus_price, collateral_price, web3, chainId)
-            // console.log(amountOutProxy);
+            const amountOutProxy = await getAmountOutDeusSwap(swapState.from, amountIn1, swapState.to, deus_price, collateral_price, web3, chainId)
             setAmountOutParams(amountOutProxy) //zero didn't use
-            amountOut = amountOutProxy ? fromWei(amountOutProxy[0], swapState.to.decimals) : ""
+
+            // amountOut = amountOutProxy ? fromWei(amountOutProxy[0], swapState.to.decimals) : ""
+            if (chainId === ChainId.MATIC) {
+                amountOut = amountOutProxy ? fromWei(amountOutProxy.at(-1), swapState.to.decimals) : ""
+            } else {
+                amountOut = amountOutProxy ? fromWei(amountOutProxy[0], swapState.to.decimals) : ""
+            }
             setAmountIn(amountIn1)
             setAmountOut(amountOut)
         }

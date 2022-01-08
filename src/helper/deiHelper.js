@@ -1,12 +1,12 @@
 import BigNumber from "bignumber.js"
-import { COLLATERAL_ADDRESS, COLLATERAL_POOL_ADDRESS, DEI_ADDRESS, DEI_COLLATERAL_ZAP, DEI_DEUS_ZAP, DEUS_ADDRESS, MINT_PATH, TO_NATIVE_PATH, DEUS_NATIVE_ZAP } from "../constant/contracts"
+import { COLLATERAL_ADDRESS, COLLATERAL_POOL_ADDRESS, DEI_ADDRESS, DEI_COLLATERAL_ZAP, DEI_DEUS_ZAP, DEUS_ADDRESS, MINT_PATH, TO_NATIVE_PATH, DEUS_NATIVE_ZAP, SELL_PATH } from "../constant/contracts"
 import { isZero, TEN } from "../constant/number"
 import { collateralToken } from "../constant/token"
 import { ChainId } from "../constant/web3"
 import { TransactionState } from "../utils/constant"
 import { CustomTransaction, getTransactionLink } from "../utils/explorers"
 import { fetcher, formatUnitAmount } from "../utils/utils"
-import { getDeiContract, getDeiStakingContract, getCollateralPoolContract, getZapContract, getNewProxyMinterContract, getDeusSwapContract } from "./contractHelpers"
+import { getDeiContract, getDeiStakingContract, getCollateralPoolContract, getZapContract, getNewProxyMinterContract, getDeusSwapContract, getDeusSwapSellContract } from "./contractHelpers"
 import { getToWei } from "./formatBalance"
 
 const baseUrl = "https://oracle4.deus.finance/dei"
@@ -328,29 +328,60 @@ export const isProxyMinter = (token, isPair, collatRatio, chainId) => {
 }
 
 
-export const getAmountOutDeusSwap = async (fromCurrency, amountIn, deus_price, collateral_price, web3, chainId) => {
+export const getAmountOutDeusSwap = async (fromCurrency, amountIn, toCurrency, deus_price, collateral_price, web3, chainId) => {
     if (!fromCurrency || !amountIn || isZero(amountIn) || deus_price === undefined) return ""
     const amountInToWei = getToWei(amountIn, fromCurrency.decimals).toFixed(0)
     const collateralPriceWei = getToWei(collateral_price, 6).toFixed(0)
     const deusPriceWei = getToWei(deus_price, 6).toFixed(0)
     let method = ""
     let params = [amountInToWei, deusPriceWei, collateralPriceWei]
-    // console.log(chainId, amountInToWei);
-
     const erc20Path = MINT_PATH[chainId][fromCurrency.symbol]
 
-    if (fromCurrency.address === COLLATERAL_ADDRESS[chainId]) {
-        method = "getUSDC2DEUSInputs"
-    } else {
-        method = "getERC202DEUSInputs"
-        if (!erc20Path) {
-            console.error("INVALID PATH with ", fromCurrency)
-            return
+    if (fromCurrency.symbol !== "DEUS") { // Buy DEUS
+        if (fromCurrency.address === COLLATERAL_ADDRESS[chainId]) {
+            method = "getUSDC2DEUSInputs"
+        } else {
+            method = "getERC202DEUSInputs"
+            if (!erc20Path) {
+                console.error("INVALID PATH with ", fromCurrency)
+                return
+            }
+            params.push(erc20Path)
         }
-        params.push(erc20Path)
+        return getDeusSwapContract(web3, chainId).methods[method](...params).call()
+
+    } else {  // Sell DEUS
+        if (chainId === ChainId.ETH) {
+            method = "getAmountOut"
+            const path = SELL_PATH[chainId][toCurrency.symbol] ? SELL_PATH[chainId][toCurrency.symbol] : []
+            let params = [amountInToWei, getJ(toCurrency), path]
+            return getDeusSwapSellContract(web3, chainId).methods[method](...params).call()
+        } else {
+            method = "getAmountsOut"
+            const path = SELL_PATH[chainId][toCurrency.symbol]
+            let params = [amountInToWei, path]
+            return getDeusSwapSellContract(web3, chainId).methods[method](...params).call()
+        }
     }
-    // console.log(method, params);
-    return getDeusSwapContract(web3, chainId).methods[method](...params).call()
+}
+
+export const getJ = (currency) => {
+    let currencySymbol = currency.symbol.toUpperCase()
+    if (currencySymbol === "DEI") return 0
+    else if (currencySymbol === "DAI") return 1
+    else if (currencySymbol === "USDC") return 2
+    else if (currencySymbol === "USDT") return 3
+    else return 2
+}
+
+export const getAmountDeusSwapSell = (toCurrency, amountIn, deus_price, collateral_price, web3, chainId) => {
+    if (!toCurrency || !amountIn || isZero(amountIn) || deus_price === undefined) return ""
+    const amountInToWei = getToWei(amountIn, toCurrency.decimals).toFixed(0)
+    const collateralPriceWei = getToWei(collateral_price, 6).toFixed(0)
+    const deusPriceWei = getToWei(deus_price, 6).toFixed(0)
+    const erc20Path = MINT_PATH[chainId][toCurrency.symbol]
+    let params = [amountInToWei, deusPriceWei, collateralPriceWei, erc20Path]
+    return getDeusSwapContract(web3, chainId).methods.getAmountOut(...params).call()
 }
 
 export const getAmountOutProxy = async (fromCurrency, amountIn, deus_price, collateral_price, web3, chainId) => {

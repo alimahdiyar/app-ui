@@ -18,8 +18,6 @@ export const MULTICALL_NETWORKS = {
 
 export const SEALED_ADDRESS = '0xd8cb412e40447eefc7ddab672f1001c5e039f166'
 
-
-
 export const MUON_PRESALE_ADDRESS = {
   [ChainId.ETH]: '0xA0b0AA5D2bd1738504577E1883537C9af3392454',
   [ChainId.MATIC]: '0x6D8f193469731F11B51b71Ef49E4aDc754EE2cE8',
@@ -66,8 +64,8 @@ export const DEUS_ADDRESS = {
   [ChainId.BSC_TESTNET]: '0xDE5ed76E7c05eC5e4572CfC88d1ACEA165109E44',
 }
 
+// DEI Pool library
 export const DEI_POOL_ADDRESS = {
-  // DEI Pool library
   [ChainId.MATIC]: '0xc63eAf6BC162531b153Dfc61F225E62d2edB4488',
   [ChainId.ETH]: '0xc63eAf6BC162531b153Dfc61F225E62d2edB4488',
   [ChainId.FTM]: '0xc63eAf6BC162531b153Dfc61F225E62d2edB4488',
@@ -94,7 +92,7 @@ export const DEUS_SWAP_ADDRESS = {
   [ChainId.MATIC]: "0xEa798f9c3eDD2A66ec036Ec754BB4561074DaCA2",
 }
 
-//LP
+/************ LP ****************/
 export const DEI_DEUS_LP = {
   [ChainId.MATIC]: '0x2Bc3ce6D7cfc0B476E60aDaA1B27DE76DB95EE4e',
   [ChainId.ETH]: '0xd6dd359B8C9d18CCB3FE8627060F88D1776d2993',
@@ -113,7 +111,12 @@ export const DEUS_NATIVE_LP = {
   [ChainId.FTM]: "0x2599Eba5fD1e49F294C76D034557948034d6C96E",
 }
 
-/************STAKING****************/
+export const DEUS_SWAP_SELL_ADDRESS = {
+  [ChainId.ETH]: '0x1009B7f4CD209708Ec5Be8476e97ccC28b767575', // FIXME: This is a temporary address (has bug)
+  [ChainId.MATIC]: "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff", //QuickSwap router 
+}
+
+/************ STAKING ****************/
 export const DEUS_NATIVE_STAKING = {
   [ChainId.MATIC]: "0x4C48f1421F62d923d9130834135FB4A58E2F4298",
   [ChainId.ETH]: '0x4C48f1421F62d923d9130834135FB4A58E2F4298',
@@ -132,7 +135,7 @@ export const DEI_COLLATERAL_STAKING = {
   [ChainId.FTM]: '0xa78Ea447ce5AA4669A5f0cD8D27bF5883E1Bf20f',
 }
 
-/************ZAPPER****************/
+/************ ZAPPER ****************/
 export const DEI_COLLATERAL_ZAP = {
   [ChainId.MATIC]: "0xeb562C1DE6806081760b9B81Dc68f1bA69835C0f",
 }
@@ -152,6 +155,12 @@ export const DEUS_NATIVE_ZAP = {
 export const WMaticAddress = {
   [ChainId.MATIC]: "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
 }
+
+export const WBTC = {
+  [ChainId.MATIC]: "",
+  [ChainId.ETH]: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+}
+
 
 export const WFTMAddress = {
   [ChainId.FTM]: "0x21be370d5312f44cb42ce377bc9b8a0cef1a4c83",
@@ -182,7 +191,8 @@ export const TO_NATIVE_PATH = {
   },
 }
 
-export const MINT_PATH = { // TO_USDC_PATH
+// TO_USDC_PATH
+export const MINT_PATH = {
   [ChainId.MATIC]: {
     DEUS: [DEUS_ADDRESS[ChainId.MATIC], WMaticAddress[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC]],
     DEUS_edited: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC]],
@@ -204,13 +214,28 @@ export const MINT_PATH = { // TO_USDC_PATH
     USDC: [COLLATERAL_ADDRESS[ChainId.ETH]],
     DAI: ['0x6B175474E89094C44Da98b954EedeAC495271d0F', COLLATERAL_ADDRESS[ChainId.ETH]],
     DEI: [DEI_ADDRESS[ChainId.ETH], COLLATERAL_ADDRESS[ChainId.ETH]],
-    wBTC: ['0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', WETHAddress[ChainId.ETH], COLLATERAL_ADDRESS[ChainId.ETH]]
+    wBTC: [WBTC[ChainId.ETH], WETHAddress[ChainId.ETH], COLLATERAL_ADDRESS[ChainId.ETH]]
   },
   [ChainId.BSC]: {
     DEUS: [DEUS_ADDRESS[ChainId.BSC], DEI_ADDRESS[ChainId.BSC], COLLATERAL_ADDRESS[ChainId.BSC]],
     DEI: [DEI_ADDRESS[ChainId.BSC], COLLATERAL_ADDRESS[ChainId.BSC]],
     WETH: [WETHAddress[ChainId.BSC], COLLATERAL_ADDRESS[ChainId.BSC]],
     USDC: [COLLATERAL_ADDRESS[ChainId.BSC]],
+  },
+}
+
+export const SELL_PATH = {
+  [ChainId.MATIC]: { // DEUS -> DEI -> USDC -> ...
+    DAI: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC], "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"],
+    DEI: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC]],
+    USDC: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC]],
+    USDT: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC], "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"],
+    WETH: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC], WETHAddress[ChainId.MATIC]],
+    MATIC: [DEUS_ADDRESS[ChainId.MATIC], DEI_ADDRESS[ChainId.MATIC], COLLATERAL_ADDRESS[ChainId.MATIC], WMaticAddress[ChainId.MATIC]],
+  },
+  [ChainId.ETH]: {
+    ETH: [COLLATERAL_ADDRESS[ChainId.ETH], WETHAddress[ChainId.ETH]],
+    wBTC: [COLLATERAL_ADDRESS[ChainId.ETH], WBTC[ChainId.ETH]],
   },
 }
 

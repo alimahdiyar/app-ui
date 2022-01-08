@@ -22,6 +22,8 @@ import DeusNativeZapAbi from '../config/abi/DeusNativeZapAbi.json'
 import DeusNativeZapAbiETH from '../config/abi/DeusNativeZapAbiETH.json'
 import MuonPresaleCrossChainAbi from '../config/abi/MuonPresaleMatic.json'
 import BridgeABI from '../config/abi/NewBridgeABI.json'
+import QuickswapRouter from '../config/abi/QuickswapRouter.json'
+import DeusSwapSellAbi from '../config/abi/DeusSwapSellAbi.json'
 import {
     DEI_ADDRESS,
     MUON_PRESALE_ADDRESS,
@@ -33,7 +35,8 @@ import {
     PROXY_MINT_ADDRESS,
     BRIDGE_ADDRESS,
     DEUS_SWAP_ADDRESS,
-    DEUS_NATIVE_ZAP
+    DEUS_NATIVE_ZAP,
+    DEUS_SWAP_SELL_ADDRESS,
 } from '../constant/contracts'
 import { ChainId } from '../constant/web3'
 import { getContractAddr } from '../utils/contracts'
@@ -129,4 +132,11 @@ export const getBridgeContract = (web3, chainId = ChainId.MATIC) => {
 
 export const getMuonContract = (web3, chainId = ChainId.MATIC) => {
     return getContract(MuonPresaleCrossChainAbi, MUON_PRESALE_ADDRESS[chainId], web3)
+}
+
+export const getDeusSwapSellContract = (web3, chainId = ChainId.MATIC) => {
+    if (chainId === ChainId.MATIC) {
+        return getContract(QuickswapRouter, DEUS_SWAP_SELL_ADDRESS[chainId], web3, chainId)
+    }
+    return getContract(DeusSwapSellAbi, DEUS_SWAP_SELL_ADDRESS[chainId], web3, chainId)
 }
